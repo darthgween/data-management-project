@@ -4,6 +4,7 @@ import pandas as pd
 import string
 from rapidfuzz import fuzz
 import math
+import recordlinkage
 
 
 google_df = pd.read_csv('../definitive_files_integration/google_places_cleaned_DEFINITIVE.csv')
@@ -65,11 +66,11 @@ def format_address_g(google_df: pd.DataFrame):
 
 def save(results: pd.DataFrame, not_found_trip: pd.DataFrame, not_found_google: pd.DataFrame):
 
-    df = pd.DataFrame(results)
-    df.insert(2, 'name_g', df.pop('name_g'))
-    df.insert(3, 'address_trip', df.pop('address_trip'))
+    # df = pd.DataFrame(results)
+    # df.insert(2, 'name_g', df.pop('name_g'))
+    # df.insert(3, 'address_trip', df.pop('address_trip'))
 
-    df.insert(3, 'address_g', df.pop('address_g'))
+    # df.insert(3, 'address_g', df.pop('address_g'))
     df.to_csv('../output_integration/integration_definitive.csv', index=False)
     df = pd.DataFrame(not_found_trip)
     df.to_csv('../output_integration/not_found_trip.csv', index=False)
@@ -99,73 +100,91 @@ results = []
 not_found_trip = []
 not_found_google = []
 
+indexer = recordlinkage.Index()
+indexer.full()
+pairs = indexer.index(trip_df, google_df)
+compare_f = recordlinkage.Compare()
+compare_f.string('formatted_name_trip', 'formatted_name_g', method='jarowinkler',label='name_score')
+compare_f.string('formatted_address_trip', 'formatted_address_g', method='jarowinkler',label='address_score')
+
+features_f = compare_f.compute(pairs, trip_df, google_df)
+features_match_f = features_f[features_f['name_score'] >= 0.8]
+features_match_f = features_f[features_f['address_score'] >= 0.8]
+save(results, not_found_trip, features_f)
 
 #cicliamo su dataset di tripadvisor
-sclice = trip_df.iloc[1740:]
+# sclice = trip_df.iloc[54:]
 
-for i,t in trip_df.iterrows():
-    if i%100 == 0 and i != 0:
-        save(results, not_found_trip, not_found_google)
-        #break
-    #sa ve
-    print("ITERATION:", i)
+# for i,t in trip_df.iterrows():
+#     if i%100 == 0 and i != 0:
+#         save(results, not_found_trip, features_f)
+#         #break
+#     #sa ve
+#     print("ITERATION:", i)
 
-    scores = []
-    scores = google_df.apply(compare_row, args=(t,), axis=1)
-    scores = [k for k in scores if k is not None]
-    if len(scores) != 0:
-        mask = google_df.Index == scores[0]['index_g']
-        #row_g = google_df[google_df['Index'] == scores[0]['index_g']]
-        row_g = google_df[mask].iloc[0]
-    #if unique merge
-    if len(scores) == 0:
+#     scores = []
+#     scores = google_df.apply(compare_row, args=(t,), axis=1)
+#     scores = [k for k in scores if k is not None]
+#     if len(scores) != 0:
+#         mask = google_df.Index == scores[0]['index_g']
+#         #row_g = google_df[google_df['Index'] == scores[0]['index_g']]
+#         row_g = google_df[mask].iloc[0]
+#     #if unique merge
+#     if len(scores) == 0:
 
-        not_found_trip.append(t)
-    elif len(scores) == 1:
-        if scores[0]['score'] == 100 and len(trip_df[trip_df['formatted_name_trip'] == scores[0]['formatted_title']]) == 1:
-            results.append({**t, **row_g})
-        else:
-            #if scores[0] == 100:
-            address_score = 100
-            #if not row_g['formatted_address_g'].isin(['italy']).any():
-            if not row_g['formatted_address_g']=='italy':
-                address_score = fuzz.token_set_ratio(row_g['formatted_address_g'], t['formatted_address_trip'])
-                if address_score >= 80 or row_g['formatted_address_g'] in t['formatted_address_trip'] or t['formatted_address_trip'] in row_g['formatted_address_g']:
-                    results.append({**t, **row_g})
-                else:
-                    not_found_trip.append(t)
-            else:
-                not_found_trip.append(t)
-            #row_g = google_df.loc[scores[0]['index_g']]
-            #google_df = google_df.drop(google_df[google_df['Index'] == row_g['Index']].index)
+#         not_found_trip.append(t)
+#     elif len(scores) == 1:
+#         if scores[0]['score'] == 100 and len(trip_df[trip_df['formatted_name_trip'] == scores[0]['formatted_title']]) == 1:
+#             results.append({**t, **row_g})
+#         else:
+#             #if scores[0] == 100:
+#             #if not row_g['formatted_address_g'].isin(['italy']).any():
+#             if not row_g['formatted_address_g']=='italy':
+#                 address_score = fuzz.token_set_ratio(row_g['formatted_address_g'], t['formatted_address_trip'])
+#                 if address_score >= 80 or row_g['formatted_address_g'] in t['formatted_address_trip'] or t['formatted_address_trip'] in row_g['formatted_address_g']:
+#                     results.append({**t, **row_g})
+#                 else:
+#                     not_found_trip.append(t)
+#             else:
+#                 not_found_trip.append(t)
+#             #row_g = google_df.loc[scores[0]['index_g']]
+#             #google_df = google_df.drop(google_df[google_df['Index'] == row_g['Index']].index)
 
-    elif len(scores) > 1:
-        final_score = 0
-        final = None
-        for sc in scores:
+#     elif len(scores) > 1:
 
-            address_score = 75
-            #if not row_g['formatted_address_g'].isin(['italy']).any():
-            if not row_g['formatted_address_g']=='italy':
+#         final_score = 0
+#         final = None
+#         found = False
+#         for sc in scores:
+#             if sc['score'] == 100 and len(trip_df[trip_df['formatted_name_trip'] == sc['formatted_title']]) == 1:
+#                 mask = google_df.Index == sc['index_g']
+#                 row_g = google_df[mask].iloc[0]
+#                 results.append({**t, **row_g})
+#                 found = True
+#                 break
+#             address_score = 75
+#             #if not row_g['formatted_address_g'].isin(['italy']).any():
+#             if not row_g['formatted_address_g']=='italy':
 
-                address_score = fuzz.token_set_ratio(sc['formatted_address_g'], t['formatted_address_trip'])
-            if final_score < address_score:
-                final_score = address_score
-                final = sc
-        #row_g = google_df[google_df['Index'] == final['index_g']]
-        if final is not None and final['formatted_address_g'] != 'italy': # and final_score >= 75:
-            mask = google_df.Index == final['index_g']
-            row_g = google_df[mask].iloc[0]
-            #row_g = google_df.loc[final['index_g']]
-            #google_df = google_df.drop(google_df[google_df['Index'] == final['index_g']].index)
-            results.append({**t, **row_g})
-        else:
-            not_found_trip.append(t)
+#                 address_score = fuzz.token_set_ratio(sc['formatted_address_g'], t['formatted_address_trip'])
+#             if final_score < address_score:
+#                 final_score = address_score
+#                 final = sc
+#         if not found:
+#             #row_g = google_df[google_df['Index'] == final['index_g']]
+#             if final is not None and final['formatted_address_g'] != 'italy' and (final_score >= 75 or row_g['formatted_address_g'] in t['formatted_address_trip'] or t['formatted_address_trip'] in row_g['formatted_address_g']):
+#                 mask = google_df.Index == final['index_g']
+#                 row_g = google_df[mask].iloc[0]
+#                 #row_g = google_df.loc[final['index_g']]
+#                 #google_df = google_df.drop(google_df[google_df['Index'] == final['index_g']].index)
+#                 results.append({**t, **row_g})
+#             else:
+#                 not_found_trip.append(t)
 
-    x = 0
-df = pd.DataFrame(results)
-df.to_csv('../output_integration/integration_definitive.csv', index=False)
-df = pd.DataFrame(not_found_trip)
-df.to_csv('../output_integration/not_found_trip.csv', index=False)
-df = pd.DataFrame(not_found_google)
-df.to_csv('../output_integration/not_found_google.csv', index=False)
+#     x = 0
+# df = pd.DataFrame(results)
+# df.to_csv('../output_integration/integration_definitive.csv', index=False)
+# df = pd.DataFrame(not_found_trip)
+# df.to_csv('../output_integration/not_found_trip.csv', index=False)
+# df = pd.DataFrame(not_found_google)
+# df.to_csv('../output_integration/not_found_google.csv', index=False)
