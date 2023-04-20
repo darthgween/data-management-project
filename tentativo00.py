@@ -52,7 +52,6 @@ google_places_cleaned_DEFINITIVE['address_g'] = google_places_cleaned_DEFINITIVE
 trip_advisor_cleaned_definitive = trip_advisor_cleaned_definitive.assign(address_trip_backup=trip_advisor_cleaned_definitive['address_trip'])
 google_places_cleaned_DEFINITIVE = google_places_cleaned_DEFINITIVE.assign(address_g_backup=google_places_cleaned_DEFINITIVE['address_g'])
 
-
 try:
     google_places_cleaned_DEFINITIVE['address_g']=google_places_cleaned_DEFINITIVE['address_g'].apply(clean_address)
     trip_advisor_cleaned_definitive['address_trip'] = trip_advisor_cleaned_definitive['address_trip'].apply(clean_address)
