@@ -6,8 +6,9 @@ from rapidfuzz import fuzz
 import math
 
 
-google_df = pd.read_csv('../definitive_files_integration/google_places_cleaned_DEFINITIVE.csv')
-trip_df = pd.read_csv('../definitive_files_integration/trip_advisor_cleaned_DEFINITIVE.csv')
+google_df = pd.read_excel('C:/Users/pc/Desktop/progetti data management/data-management-project/google_indirizzo_pulito.xlsx')
+trip_df = pd.read_excel('C:/Users/pc/Desktop/progetti data management/data-management-project/trip_indirizzo_pulito_excel.xlsx')
+
 
 # Define the translation table for removing special characters
 trans_table = str.maketrans('', '', string.punctuation)
@@ -46,6 +47,8 @@ def format_address_g(google_df: pd.DataFrame):
     def format_address(row):
         #remove ', Milano'
         string = row['address_g']
+        if isinstance(string, float):
+            string=str(string)
         index = string.find(', Milano')
         if index != -1:
             ret = string[:index] + string[index+len(', Milano'):]
@@ -58,12 +61,11 @@ def format_address_g(google_df: pd.DataFrame):
 
 def save(results: pd.DataFrame, not_found_trip: pd.DataFrame, not_found_google: pd.DataFrame):
     df = pd.DataFrame(results)
-    df.to_csv('../output_integration/integration_definitive.csv', index=False)
+    df.to_excel('../output_integration/integration_definitive.xlsx', index=False)
     df = pd.DataFrame(not_found_trip)
-    df.to_csv('../output_integration/not_found_trip.csv', index=False)
+    df.to_excel('../output_integration/not_found_trip.xlsx', index=False)
     df = pd.DataFrame(not_found_google)
-    df.to_csv('../output_integration/not_found_google.csv', index=False)
-
+    df.to_excel('not_found_google.xlsx', index=False)
 def compare_row(row, trip):
         g = row['formatted_name_g']
         t = trip['formatted_name_trip']
@@ -139,8 +141,8 @@ for i,t in trip_df.iterrows():
         results.append({**t, **row_g})
     x = 0
 df = pd.DataFrame(results)
-df.to_excel('integration_definitive.xlsx', index=False)
+df.to_excel('../output_integration/integration_definitive.xlsx', index=False)
 df = pd.DataFrame(not_found_trip)
-df.to_excel('not_found_trip.xlsx', index=False)
+df.to_excel('../output_integration/not_found_trip.xlsx', index=False)
 df = pd.DataFrame(not_found_google)
 df.to_excel('not_found_google.xlsx', index=False)
